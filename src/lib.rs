@@ -74,27 +74,61 @@ fn send_task(worker: &Worker, task: &Task) {
   }
 }
 
-fn load_task(config: Config) -> Task {
-  let task_name = config.app;
-  
-  if let Ok(task_content) = fs::read_to_string(&task_name) {
-    Task::new(task_name, task_content)
-  } else {
-    panic!()
-  }
+fn run_task(worker: &Worker, task: &Task, (start, end): (&str , &str)) -> Result<String, reqwest::Error> {
+  let request_url = format!("{}/task/{}/run", worker.url, task.task_name);
+
+  let client = reqwest::blocking::Client::new();
+  let response = client.post(request_url)
+    .body(format!("{} {}", start, end))
+    .send();
+
+  response?.text()
 }
+
+fn load_task(config: &Config) -> Task {
+  let task_name = &config.app;
+  
+  let task_content = match fs::read_to_string(&task_name) {
+    Ok(content) => content,
+    Err(_) => panic!()
+  };
+
+  Task::new(task_name.to_owned(), task_content)
+}
+
+fn load_params(config: &Config) -> Vec<String> {
+  let task_args = &config.starting_args;
+  
+  let task_content = match fs::read_to_string(&task_args) {
+    Ok(content) => content,
+    Err(_) => panic!()
+  };
+
+  let mut result: Vec<String> = vec![];
+  for line in task_content.split_ascii_whitespace() {
+    result.push(line.to_owned());
+  }
+
+  result
+}
+
 pub fn run(config: Config) {
   let workers = vec![
     Worker::new("http://localhost:8000"),
-    Worker::new("http://worker1:8000"),
-    Worker::new("http://worker2:8000"),
-    Worker::new("http://worker3:8000"),
   ];
 
-  let task = load_task(config);
-  let workers = detect_workers(workers);
+  let task = load_task(&config);
+  let params = load_params(&config);
 
+  let start = params.first().unwrap();
+  let end = params.first().unwrap();
+  
+  let workers = detect_workers(workers);
+  
   for worker in workers {
     send_task(&worker, &task);
+    let result = run_task(&worker, &task, (start, end));
+
+    println!("{}", result.unwrap());
   }
 }
