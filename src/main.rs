@@ -9,5 +9,5 @@ fn main() {
         process::exit(1);
     });
 
-    offload::detect_workers();
+    offload::run(config);
 }
