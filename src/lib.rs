@@ -105,7 +105,7 @@ pub async fn run(config: Config) -> Result<(), io::Error> {
     let task = load_task(&config);
     let mut params = load_params(&config)?;
     
-    let workers = vec![Worker::new("http://localhost:8000")];
+    let workers = vec![Worker::new("http://172.27.111.105:8000")];
     let workers = detect_workers(workers).await;
 
     let client = Client::new();
