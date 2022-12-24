@@ -5,8 +5,7 @@ use std::{fs, io};
 
 pub mod prelude;
 
-async fn is_worker_up(url: &str) -> bool {
-    let client = Client::new();
+async fn is_worker_up(client: &Client, url: &str) -> bool {
     let resp = client.get(url).send().await;
 
     match resp {
@@ -15,11 +14,11 @@ async fn is_worker_up(url: &str) -> bool {
     }
 }
 
-async fn detect_workers(workers: Vec<Worker>) -> Vec<Worker> {
+async fn detect_workers(client: &Client, workers: Vec<Worker>) -> Vec<Worker> {
     let mut good_workers: Vec<Worker> = Vec::new();
-
+    
     for worker in workers {
-        if is_worker_up(worker.url).await {
+        if is_worker_up(client, worker.url).await {
             good_workers.push(worker)
         }
     }
@@ -79,8 +78,7 @@ fn load_params(config: &Config) -> Result<Vec<String>, io::Error> {
     Ok(result)
 }
 
-async fn distribute_params(task: &Task, params: &mut Vec<String>, workers: & Vec<Worker>) {
-    let client = Client::new();
+async fn distribute_params(client: &Client, task: &Task, params: &mut Vec<String>, workers: & Vec<Worker>) {
     let mut futures = futures::stream::FuturesUnordered::new();
     for worker in workers {
         let param = match params.pop() {
@@ -104,17 +102,17 @@ async fn distribute_params(task: &Task, params: &mut Vec<String>, workers: & Vec
 pub async fn run(config: Config) -> Result<(), io::Error> {
     let task = load_task(&config);
     let mut params = load_params(&config)?;
-    
-    let workers = vec![Worker::new("http://172.27.111.105:8000")];
-    let workers = detect_workers(workers).await;
-
     let client = Client::new();
+    
+    let workers = vec![Worker::new("http://192.168.192.161:8000"), Worker::new("http://192.168.178.61:8000")];
+    let workers = detect_workers(&client, workers).await;
+
 
     for worker in &workers {
         send_task(&client, &worker, &task).await.unwrap();
     }
 
-    distribute_params(&task, &mut params, &workers).await;
+    distribute_params(&client, &task, &mut params, &workers).await;
 
     Ok(())
 }
