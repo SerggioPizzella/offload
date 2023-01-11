@@ -1,44 +1,22 @@
-#![feature(proc_macro_hygiene, decl_macro)]
+mod id_seed;
+mod end_points;
+mod prelude;
 
 #[macro_use] extern crate rocket;
-use rocket::config::Environment;
 
-use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use id_seed::IdSeed;
+use end_points::*;
 
-use rocket::{Data, State};
-
-#[post("/<name>", data = "<content>")]
-fn upload(name: String, content: Data, id_seed: State<IdSeed>) -> Result<String, std::io::Error>{
-	let id = id_seed.seed.load(Ordering::Relaxed);
-	id_seed.seed.fetch_add(1, Ordering::Relaxed);
-    
-	let filepath = format!("upload/{}-{}", name, id);
-
-	content.stream_to_file(Path::new(&filepath))?;
-
-	Ok(filepath)
-}
-struct IdSeed {
-	seed: AtomicUsize
-}
-
-impl IdSeed {
-	fn new(value: usize) -> IdSeed {
-		IdSeed { seed: AtomicUsize::new(value) }
-	}
-}
-
-fn main() {
+#[launch]
+fn launch() -> _ {
     let ip = local_ip_address::local_ip().unwrap().to_string();
 
-    let config = rocket::Config::build(Environment::Development)
-        .address(ip)
-        .port(8000)
-        .unwrap();
+    let config = rocket::Config::figment()
+        .merge(("ip", ip))
+        .merge(("port", 8000));
 
     rocket::custom(config)
 		.manage(IdSeed::new(0))
-        .mount("/upload", routes![upload])
-        .launch();
+        .mount("/upload", routes![upload_task, upload_args])
+        .mount("/run", routes![run_task])
 }

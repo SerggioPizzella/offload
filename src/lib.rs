@@ -1,9 +1,10 @@
-use crate::prelude::*;
+pub mod prelude;
+
 use futures::StreamExt;
 use reqwest::Client;
 use std::{fs, io};
 
-pub mod prelude;
+use prelude::*;
 
 async fn is_worker_up(client: &Client, url: &str) -> bool {
     let resp = client.get(url).send().await;
